@@ -354,9 +354,9 @@ function App() {
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
                 <SafeIcon icon={FiCpu} className="w-6 h-6 text-white" />
               </div>
-              <h1 className="text-3xl font-bold text-slate-900">AI Apps Directory</h1>
+              <h1 className="text-3xl font-bold text-slate-900">Michis AI Apps Directory</h1>
             </div>
-            <p className="text-slate-600">Discover and organize the best AI-powered applications</p>
+           
           </div>
           <div className="flex items-center gap-3">
             <button
