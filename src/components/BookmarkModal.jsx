@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import SafeIcon from '../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
 
-const { FiX, FiGlobe, FiPlus, FiTag } = FiIcons;
+const { FiX, FiGlobe, FiPlus, FiTag, FiStar } = FiIcons;
 
 const BookmarkModal = ({ onClose, onSave, existingTags = [], bookmark = null }) => {
   const isEditing = !!bookmark;
@@ -11,18 +11,18 @@ const BookmarkModal = ({ onClose, onSave, existingTags = [], bookmark = null }) 
     url: '',
     description: '',
     commentary: '',
-    tags: []
+    tags: [],
+    favorite: false
   });
   const [tagInput, setTagInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [suggestedTags, setSuggestedTags] = useState([]);
 
-  // AI-focused suggested tags
+  // Updated popular AI tags focused on content types
   const aiSuggestedTags = [
-    'ai', 'chatbot', 'machine-learning', 'nlp', 'computer-vision', 
-    'generative-ai', 'llm', 'automation', 'productivity', 'creative',
-    'coding', 'writing', 'image-generation', 'video', 'audio',
-    'research', 'analytics', 'development', 'openai', 'anthropic'
+    'images', 'videos', 'music', 'voice', 'text/chatbot', 'ai', 'productivity', 
+    'creative', 'automation', 'coding', 'writing', 'research', 'analytics', 
+    'development', 'editing'
   ];
 
   // Initialize form data if editing an existing bookmark
@@ -33,7 +33,8 @@ const BookmarkModal = ({ onClose, onSave, existingTags = [], bookmark = null }) 
         url: bookmark.url || '',
         description: bookmark.description || '',
         commentary: bookmark.commentary || '',
-        tags: bookmark.tags || []
+        tags: bookmark.tags || [],
+        favorite: bookmark.favorite || false
       });
     }
   }, [bookmark]);
@@ -54,11 +55,7 @@ const BookmarkModal = ({ onClose, onSave, existingTags = [], bookmark = null }) 
           if (!formData.name) {
             let suggestedName = domain.split('.')[0];
             suggestedName = suggestedName.charAt(0).toUpperCase() + suggestedName.slice(1);
-            
-            setFormData(prev => ({
-              ...prev,
-              name: suggestedName
-            }));
+            setFormData(prev => ({ ...prev, name: suggestedName }));
           }
           
           // Generate AI-focused suggested tags based on URL
@@ -70,15 +67,21 @@ const BookmarkModal = ({ onClose, onSave, existingTags = [], bookmark = null }) 
           
           // Add AI-specific suggestions based on common AI domains
           if (domain.includes('openai') || domain.includes('chatgpt')) {
-            urlSuggestedTags.push('ai', 'chatbot', 'openai');
+            urlSuggestedTags.push('ai', 'text/chatbot');
           } else if (domain.includes('claude') || domain.includes('anthropic')) {
-            urlSuggestedTags.push('ai', 'chatbot', 'anthropic');
-          } else if (domain.includes('midjourney') || domain.includes('dalle')) {
-            urlSuggestedTags.push('ai', 'image-generation', 'creative');
+            urlSuggestedTags.push('ai', 'text/chatbot');
+          } else if (domain.includes('midjourney') || domain.includes('dalle') || domain.includes('leonardo')) {
+            urlSuggestedTags.push('ai', 'images', 'creative');
+          } else if (domain.includes('runway') || domain.includes('pika')) {
+            urlSuggestedTags.push('ai', 'videos', 'creative');
+          } else if (domain.includes('eleven') || domain.includes('murf') || domain.includes('voice')) {
+            urlSuggestedTags.push('ai', 'voice');
+          } else if (domain.includes('suno') || domain.includes('udio') || domain.includes('music')) {
+            urlSuggestedTags.push('ai', 'music');
           } else if (domain.includes('github') && formData.url.includes('copilot')) {
             urlSuggestedTags.push('ai', 'coding', 'development');
           } else if (domain.includes('huggingface')) {
-            urlSuggestedTags.push('ai', 'machine-learning', 'models');
+            urlSuggestedTags.push('ai', 'development');
           } else {
             // Default AI suggestions
             urlSuggestedTags.push('ai', 'productivity');
@@ -88,7 +91,7 @@ const BookmarkModal = ({ onClose, onSave, existingTags = [], bookmark = null }) 
           const filteredSuggestions = urlSuggestedTags
             .filter(tag => !formData.tags.includes(tag))
             .filter((tag, index, self) => self.indexOf(tag) === index);
-          
+            
           setSuggestedTags(filteredSuggestions);
           setIsLoading(false);
         }, 500);
@@ -97,7 +100,7 @@ const BookmarkModal = ({ onClose, onSave, existingTags = [], bookmark = null }) 
         setIsLoading(false);
       }
     };
-
+    
     extractMetadata();
   }, [formData.url, isEditing]);
 
@@ -111,6 +114,10 @@ const BookmarkModal = ({ onClose, onSave, existingTags = [], bookmark = null }) 
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const toggleFavorite = () => {
+    handleChange('favorite', !formData.favorite);
   };
 
   const addTag = () => {
@@ -153,7 +160,7 @@ const BookmarkModal = ({ onClose, onSave, existingTags = [], bookmark = null }) 
             <SafeIcon icon={FiX} className="w-5 h-5 text-slate-500" />
           </button>
         </div>
-
+        
         <form onSubmit={handleSubmit} className="p-6">
           <div className="space-y-4">
             {/* URL Input - First for better UX */}
@@ -192,6 +199,25 @@ const BookmarkModal = ({ onClose, onSave, existingTags = [], bookmark = null }) 
                 placeholder="e.g., ChatGPT"
                 required
               />
+            </div>
+            
+            {/* Favorite Toggle */}
+            <div>
+              <button
+                type="button"
+                onClick={toggleFavorite}
+                className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-all ${
+                  formData.favorite 
+                    ? 'bg-yellow-50 border-yellow-300 text-yellow-800' 
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <SafeIcon 
+                  icon={FiStar} 
+                  className={`w-5 h-5 ${formData.favorite ? 'text-yellow-500' : 'text-slate-400'}`} 
+                />
+                {formData.favorite ? 'Marked as Favorite' : 'Mark as Favorite'}
+              </button>
             </div>
 
             {/* Description Input */}
@@ -270,29 +296,31 @@ const BookmarkModal = ({ onClose, onSave, existingTags = [], bookmark = null }) 
                 </div>
               )}
 
-              {/* Common AI tags */}
-              {aiSuggestedTags.length > 0 && (
-                <div className="mb-3">
-                  <p className="text-xs text-slate-500 mb-2">Popular AI tags:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {aiSuggestedTags
-                      .filter(tag => !formData.tags.includes(tag))
-                      .slice(0, 10)
-                      .map(tag => (
-                        <button
-                          key={tag}
-                          type="button"
-                          onClick={() => addSuggestedTag(tag)}
-                          className="px-2 py-1 bg-gradient-to-r from-blue-50 to-purple-50 text-slate-700 rounded text-xs hover:from-blue-100 hover:to-purple-100 flex items-center gap-1 border border-slate-200"
-                        >
-                          <SafeIcon icon={FiTag} className="w-3 h-3" />
-                          {tag}
-                          <SafeIcon icon={FiPlus} className="w-3 h-3" />
-                        </button>
-                      ))}
-                  </div>
+              {/* Popular AI tags */}
+              <div className="mb-3">
+                <p className="text-xs text-slate-500 mb-2">Popular AI categories:</p>
+                <div className="flex flex-wrap gap-2">
+                  {aiSuggestedTags
+                    .filter(tag => !formData.tags.includes(tag))
+                    .slice(0, 15)
+                    .map(tag => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => addSuggestedTag(tag)}
+                        className={`px-2 py-1 rounded text-xs hover:scale-105 transition-transform flex items-center gap-1 border border-slate-200 ${
+                          ['images', 'videos', 'music', 'voice', 'text/chatbot'].includes(tag)
+                            ? 'bg-gradient-to-r from-blue-100 to-purple-100 text-blue-800 font-medium'
+                            : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        <SafeIcon icon={FiTag} className="w-3 h-3" />
+                        {tag}
+                        <SafeIcon icon={FiPlus} className="w-3 h-3" />
+                      </button>
+                    ))}
                 </div>
-              )}
+              </div>
 
               {/* Tag input */}
               <div className="flex gap-2">

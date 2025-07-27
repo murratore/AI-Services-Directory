@@ -1,5 +1,5 @@
-/**
- * Utility functions for exporting and importing bookmark data
+/** 
+ * Utility functions for exporting and importing bookmark data 
  */
 
 /**
@@ -24,6 +24,7 @@ export const exportBookmarks = (bookmarks, filename = null) => {
         description: bookmark.description || '',
         commentary: bookmark.commentary || '',
         tags: bookmark.tags || [],
+        favorite: bookmark.favorite || false,
         favicon: bookmark.favicon || '',
         createdAt: bookmark.createdAt || new Date().toISOString()
       }))
@@ -39,10 +40,17 @@ export const exportBookmarks = (bookmarks, filename = null) => {
     link.click();
     document.body.removeChild(link);
     
-    return { success: true, filename: finalFilename, count: bookmarks.length };
+    return {
+      success: true,
+      filename: finalFilename,
+      count: bookmarks.length
+    };
   } catch (error) {
     console.error('Error exporting bookmarks:', error);
-    return { success: false, error: error.message };
+    return {
+      success: false,
+      error: error.message
+    };
   }
 };
 
@@ -85,10 +93,11 @@ export const importBookmarks = (file) => {
             description: bookmark.description || '',
             commentary: bookmark.commentary || '',
             tags: Array.isArray(bookmark.tags) ? bookmark.tags : [],
+            favorite: bookmark.favorite || false,
             favicon: bookmark.favicon || `https://www.google.com/s2/favicons?domain=${new URL(bookmark.url).hostname}&sz=32`,
             createdAt: bookmark.createdAt || new Date().toISOString()
           }));
-        
+          
         if (validBookmarks.length === 0) {
           resolve({ success: false, error: 'No valid bookmarks found in the file' });
           return;
@@ -104,7 +113,6 @@ export const importBookmarks = (file) => {
             version: jsonData.version
           }
         });
-        
       } catch (error) {
         resolve({ success: false, error: 'Invalid JSON file: ' + error.message });
       }
@@ -159,7 +167,10 @@ export const mergeBookmarks = (existingBookmarks, importedBookmarks, duplicateSt
     
     if (urlExists) {
       if (duplicateStrategy === 'replace') {
-        const index = mergedBookmarks.findIndex(b => b.url.toLowerCase() === importedBookmark.url.toLowerCase());
+        const index = mergedBookmarks.findIndex(b => 
+          b.url.toLowerCase() === importedBookmark.url.toLowerCase()
+        );
+        
         if (index !== -1) {
           mergedBookmarks[index] = importedBookmark;
           replaced++;
@@ -170,11 +181,17 @@ export const mergeBookmarks = (existingBookmarks, importedBookmarks, duplicateSt
     } else if (nameExists && duplicateStrategy === 'rename') {
       let counter = 1;
       let newName = `${importedBookmark.name} (${counter})`;
+      
       while (existingNames.has(newName.toLowerCase())) {
         counter++;
         newName = `${importedBookmark.name} (${counter})`;
       }
-      mergedBookmarks.push({ ...importedBookmark, name: newName });
+      
+      mergedBookmarks.push({
+        ...importedBookmark,
+        name: newName
+      });
+      
       existingNames.add(newName.toLowerCase());
       existingUrls.add(importedBookmark.url.toLowerCase());
       added++;
@@ -188,6 +205,11 @@ export const mergeBookmarks = (existingBookmarks, importedBookmarks, duplicateSt
   
   return {
     bookmarks: mergedBookmarks,
-    statistics: { added, skipped, replaced, total: importedBookmarks.length }
+    statistics: {
+      added,
+      skipped,
+      replaced,
+      total: importedBookmarks.length
+    }
   };
 };

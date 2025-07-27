@@ -2,9 +2,9 @@ import React, { useState, useRef } from 'react';
 import SafeIcon from '../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
 
-const { FiX, FiDownload, FiUpload, FiFile, FiCheck, FiAlertCircle, FiInfo } = FiIcons;
+const { FiX, FiDownload, FiUpload, FiFile, FiCheck, FiAlertCircle, FiInfo, FiLock } = FiIcons;
 
-const ImportExportModal = ({ onClose, onExport, onImport, bookmarksCount }) => {
+const ImportExportModal = ({ onClose, onExport, onImport, bookmarksCount, isAuthenticated, onAuthRequest }) => {
   const [activeTab, setActiveTab] = useState('export');
   const [importFile, setImportFile] = useState(null);
   const [importResult, setImportResult] = useState(null);
@@ -21,17 +21,30 @@ const ImportExportModal = ({ onClose, onExport, onImport, bookmarksCount }) => {
   const handleImport = async () => {
     if (!importFile) return;
     
+    if (!isAuthenticated) {
+      onAuthRequest();
+      return;
+    }
+    
     setIsProcessing(true);
     try {
       const result = await onImport(importFile, duplicateStrategy);
       setImportResult(result);
     } catch (error) {
-      setImportResult({ success: false, error: error.message });
+      setImportResult({
+        success: false,
+        error: error.message
+      });
     }
     setIsProcessing(false);
   };
 
   const handleExport = () => {
+    if (!isAuthenticated) {
+      onAuthRequest();
+      return;
+    }
+    
     onExport();
     // Show success message or close modal after a short delay
     setTimeout(() => {
@@ -54,6 +67,25 @@ const ImportExportModal = ({ onClose, onExport, onImport, bookmarksCount }) => {
           </button>
         </div>
 
+        {/* Authentication Required Banner */}
+        {!isAuthenticated && (
+          <div className="mx-6 mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3">
+            <SafeIcon icon={FiLock} className="w-5 h-5 text-amber-600 flex-shrink-0" />
+            <div>
+              <h3 className="font-medium text-amber-800 text-sm">Authentication Required</h3>
+              <p className="text-xs text-amber-700">
+                You need to log in to import or export AI apps
+              </p>
+            </div>
+            <button
+              onClick={onAuthRequest}
+              className="ml-auto px-3 py-1 bg-amber-600 text-white text-xs rounded hover:bg-amber-700"
+            >
+              Log In
+            </button>
+          </div>
+        )}
+        
         {/* Tabs */}
         <div className="flex border-b border-slate-200">
           <button
@@ -91,7 +123,8 @@ const ImportExportModal = ({ onClose, onExport, onImport, bookmarksCount }) => {
                   Export Your AI Apps
                 </h3>
                 <p className="text-slate-600 mb-6">
-                  Download all your AI applications as a JSON file. You can use this file to backup your data or import it later.
+                  Download all your AI applications as a JSON file. You can use this file to backup your data or
+                  import it later.
                 </p>
               </div>
 
@@ -106,7 +139,12 @@ const ImportExportModal = ({ onClose, onExport, onImport, bookmarksCount }) => {
 
               <button
                 onClick={handleExport}
-                className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all flex items-center justify-center gap-2"
+                disabled={!isAuthenticated}
+                className={`w-full px-4 py-3 rounded-lg flex items-center justify-center gap-2 ${
+                  isAuthenticated 
+                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700' 
+                    : 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                } transition-all`}
               >
                 <SafeIcon icon={FiDownload} className="w-4 h-4" />
                 Export AI Apps
@@ -161,6 +199,7 @@ const ImportExportModal = ({ onClose, onExport, onImport, bookmarksCount }) => {
                     value={duplicateStrategy}
                     onChange={(e) => setDuplicateStrategy(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={!isAuthenticated}
                   >
                     <option value="skip">Skip duplicates (recommended)</option>
                     <option value="replace">Replace existing apps</option>
@@ -176,8 +215,12 @@ const ImportExportModal = ({ onClose, onExport, onImport, bookmarksCount }) => {
                 {/* Import Button */}
                 <button
                   onClick={handleImport}
-                  disabled={!importFile || isProcessing}
-                  className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                  disabled={!importFile || isProcessing || !isAuthenticated}
+                  className={`w-full px-4 py-3 rounded-lg flex items-center justify-center gap-2 ${
+                    !importFile || isProcessing || !isAuthenticated
+                      ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                      : 'bg-green-600 text-white hover:bg-green-700'
+                  } transition-colors`}
                 >
                   {isProcessing ? (
                     <>
@@ -198,11 +241,11 @@ const ImportExportModal = ({ onClose, onExport, onImport, bookmarksCount }) => {
                     importResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
                   }`}>
                     <div className="flex items-start gap-3">
-                      <SafeIcon 
-                        icon={importResult.success ? FiCheck : FiAlertCircle} 
+                      <SafeIcon
+                        icon={importResult.success ? FiCheck : FiAlertCircle}
                         className={`w-5 h-5 mt-0.5 ${
                           importResult.success ? 'text-green-600' : 'text-red-600'
-                        }`} 
+                        }`}
                       />
                       <div className="flex-1">
                         <h4 className={`font-medium ${
@@ -216,8 +259,10 @@ const ImportExportModal = ({ onClose, onExport, onImport, bookmarksCount }) => {
                           {importResult.success ? (
                             <>
                               Added {importResult.statistics?.added || 0} AI apps
-                              {importResult.statistics?.skipped > 0 && `, skipped ${importResult.statistics.skipped} duplicates`}
-                              {importResult.statistics?.replaced > 0 && `, replaced ${importResult.statistics.replaced} existing`}
+                              {importResult.statistics?.skipped > 0 && 
+                                `, skipped ${importResult.statistics.skipped} duplicates`}
+                              {importResult.statistics?.replaced > 0 && 
+                                `, replaced ${importResult.statistics.replaced} existing`}
                             </>
                           ) : (
                             importResult.error

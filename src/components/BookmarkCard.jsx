@@ -5,7 +5,7 @@ import TagInput from './TagInput';
 import SafeIcon from '../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
 
-const { FiExternalLink, FiEdit2, FiTrash2, FiGripVertical, FiGlobe, FiTag } = FiIcons;
+const { FiExternalLink, FiEdit2, FiTrash2, FiGripVertical, FiGlobe, FiTag, FiLock, FiStar } = FiIcons;
 
 const BookmarkCard = ({ bookmark, index, onUpdate, onDelete, tagColors, onEdit }) => {
   const [faviconError, setFaviconError] = useState(false);
@@ -23,14 +23,20 @@ const BookmarkCard = ({ bookmark, index, onUpdate, onDelete, tagColors, onEdit }
     }
   };
 
+  const toggleFavorite = (e) => {
+    e.stopPropagation();
+    onUpdate(bookmark.id, { favorite: !bookmark.favorite });
+  };
+
   return (
     <Draggable draggableId={bookmark.id} index={index}>
       {(provided, snapshot) => (
-        <div 
+        <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          className={`bg-white rounded-lg border border-slate-200 overflow-hidden transition-all duration-200 flex flex-col
-            ${snapshot.isDragging ? 'shadow-lg scale-105' : 'hover:shadow-md hover:border-slate-300'}`}
+          className={`bg-white rounded-lg border border-slate-200 overflow-hidden transition-all duration-200 flex flex-col ${
+            snapshot.isDragging ? 'shadow-lg scale-105' : 'hover:shadow-md hover:border-slate-300'
+          } ${bookmark.favorite ? 'ring-2 ring-yellow-400' : ''}`}
         >
           {/* Header with Favicon */}
           <div className="w-full h-20 bg-gradient-to-br from-slate-50 to-slate-100 relative overflow-hidden flex items-center justify-center">
@@ -38,12 +44,24 @@ const BookmarkCard = ({ bookmark, index, onUpdate, onDelete, tagColors, onEdit }
               <img 
                 src={bookmark.favicon} 
                 alt={bookmark.name} 
-                className="w-8 h-8"
-                onError={handleFaviconError}
+                className="w-8 h-8" 
+                onError={handleFaviconError} 
               />
             ) : (
               <SafeIcon icon={FiGlobe} className="w-8 h-8 text-slate-400" />
             )}
+            
+            {/* Favorite star */}
+            <button
+              onClick={toggleFavorite}
+              className={`absolute top-2 right-2 w-8 h-8 flex items-center justify-center rounded-full transition-all ${
+                bookmark.favorite 
+                  ? 'bg-yellow-400 text-white shadow-md hover:bg-yellow-500' 
+                  : 'bg-white/80 text-slate-400 hover:bg-slate-100 hover:text-yellow-500'
+              }`}
+            >
+              <SafeIcon icon={FiStar} className={`w-4 h-4 ${bookmark.favorite ? 'text-white' : ''}`} />
+            </button>
             
             {/* Domain overlay */}
             <div className="absolute bottom-2 left-2 right-2">
@@ -52,38 +70,38 @@ const BookmarkCard = ({ bookmark, index, onUpdate, onDelete, tagColors, onEdit }
               </span>
             </div>
           </div>
-          
+
           {/* Content */}
           <div className="p-4 flex-1 flex flex-col">
             <div className="flex items-start justify-between mb-2">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
-                  <div 
-                    {...provided.dragHandleProps} 
+                  <div
+                    {...provided.dragHandleProps}
                     className="p-1 rounded hover:bg-slate-200 cursor-grab active:cursor-grabbing"
                   >
                     <SafeIcon icon={FiGripVertical} className="w-3 h-3 text-slate-400" />
                   </div>
                   <span className="font-medium text-slate-900">{bookmark.name}</span>
                 </div>
-                
+
                 {bookmark.description && (
                   <p className="text-sm text-slate-600 mb-2">
                     {bookmark.description}
                   </p>
                 )}
-                
+
                 {bookmark.commentary && (
                   <p className="text-xs text-slate-600 italic mb-3">
                     "{bookmark.commentary}"
                   </p>
                 )}
               </div>
-              
+
               <div className="flex items-center gap-1 ml-2">
-                <a 
-                  href={bookmark.url} 
-                  target="_blank" 
+                <a
+                  href={bookmark.url}
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                   title="Open bookmark"
@@ -106,12 +124,12 @@ const BookmarkCard = ({ bookmark, index, onUpdate, onDelete, tagColors, onEdit }
                 </button>
               </div>
             </div>
-            
+
             {/* Tags */}
             {bookmark.tags.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-auto pt-3">
                 {bookmark.tags.map(tag => (
-                  <span 
+                  <span
                     key={tag}
                     className="flex items-center gap-1 px-2 py-1 rounded text-xs text-white"
                     style={{ backgroundColor: tagColors(tag) }}
