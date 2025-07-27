@@ -88,12 +88,12 @@ function App() {
       },
       {
         id: '8',
-        name: 'Notion AI',
-        url: 'https://notion.so/product/ai',
-        description: 'AI writing assistant integrated into Notion workspace',
+        name: 'Leonardo AI',
+        url: 'https://leonardo.ai',
+        description: 'AI Pictures',
         commentary: 'Seamlessly enhances productivity within Notion pages',
-        tags: ['ai', 'productivity', 'writing', 'workspace'],
-        favicon: 'https://notion.so/favicon.ico'
+        tags: ['images', 'videos'],
+        favicon: 'https://leonardo.ai/favicon.ico'
       }
     ];
     
