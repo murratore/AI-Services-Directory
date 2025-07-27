@@ -21,7 +21,8 @@
     "echarts": "^5.5.0",
     "echarts-for-react": "^3.0.2",
     "date-fns": "4.1.0",
-    "react-beautiful-dnd": "^13.1.1"
+    "react-beautiful-dnd": "^13.1.1",
+    "dompurify": "^3.0.6"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",

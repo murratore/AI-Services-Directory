@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import SafeIcon from '../common/SafeIcon';
+import { fetchMetadata } from '../services/metadataService';
 import * as FiIcons from 'react-icons/fi';
 
-const { FiX, FiGlobe, FiPlus, FiTag, FiStar } = FiIcons;
+const { FiX, FiGlobe, FiPlus, FiTag, FiStar, FiLoader, FiAlertCircle, FiInfo } = FiIcons;
 
 const BookmarkModal = ({ onClose, onSave, existingTags = [], bookmark = null }) => {
   const isEditing = !!bookmark;
@@ -17,13 +18,9 @@ const BookmarkModal = ({ onClose, onSave, existingTags = [], bookmark = null }) 
   const [tagInput, setTagInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [suggestedTags, setSuggestedTags] = useState([]);
-
-  // Updated popular AI tags focused on content types
-  const aiSuggestedTags = [
-    'images', 'videos', 'music', 'voice', 'text/chatbot', 'ai', 'productivity', 
-    'creative', 'automation', 'coding', 'writing', 'research', 'analytics', 
-    'development', 'editing'
-  ];
+  const [metadataError, setMetadataError] = useState(null);
+  const [metadataFetched, setMetadataFetched] = useState(false);
+  const [descriptionSource, setDescriptionSource] = useState('');
 
   // Initialize form data if editing an existing bookmark
   useEffect(() => {
@@ -39,70 +36,69 @@ const BookmarkModal = ({ onClose, onSave, existingTags = [], bookmark = null }) 
     }
   }, [bookmark]);
 
+  // Function to fetch metadata from URL
+  const extractMetadata = async (url) => {
+    if (!url || !url.trim().startsWith('http')) return;
+    
+    setIsLoading(true);
+    setMetadataError(null);
+    
+    try {
+      const result = await fetchMetadata(url);
+      
+      if (result.success) {
+        // Only update fields that aren't already populated by user
+        const updatedData = { ...formData };
+        
+        if (!formData.name || formData.name === '') {
+          updatedData.name = result.metadata.title || '';
+        }
+        
+        if (!formData.description || formData.description === '') {
+          updatedData.description = result.metadata.description || '';
+          // Set description source for UI feedback
+          if (result.metadata.description) {
+            setDescriptionSource('metadata');
+          } else {
+            setDescriptionSource('fallback');
+          }
+        }
+        
+        // Only suggest tags, don't automatically add them
+        const newSuggestedTags = (result.metadata.suggestedTags || [])
+          .filter(tag => !formData.tags.includes(tag))
+          .filter((tag, index, self) => self.indexOf(tag) === index);
+          
+        setSuggestedTags(newSuggestedTags);
+        setFormData(updatedData);
+        setMetadataFetched(true);
+      } else {
+        setMetadataError(result.error || 'Failed to extract website information');
+        setDescriptionSource('error');
+      }
+    } catch (error) {
+      console.error("Error extracting metadata:", error);
+      setMetadataError("Failed to extract website information");
+      setDescriptionSource('error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Try to extract metadata when URL changes and we're not editing
   useEffect(() => {
-    const extractMetadata = async () => {
-      try {
-        if (!formData.url || !formData.url.startsWith('http') || isEditing) return;
-        
-        setIsLoading(true);
-        
-        // Simulate metadata extraction with AI-focused suggestions
-        setTimeout(() => {
-          const domain = new URL(formData.url).hostname.replace('www.', '');
-          
-          // Auto-suggest title based on URL
-          if (!formData.name) {
-            let suggestedName = domain.split('.')[0];
-            suggestedName = suggestedName.charAt(0).toUpperCase() + suggestedName.slice(1);
-            setFormData(prev => ({ ...prev, name: suggestedName }));
-          }
-          
-          // Generate AI-focused suggested tags based on URL
-          const urlSuggestedTags = [];
-          
-          // Add domain-based tag
-          const domainName = domain.split('.')[0].toLowerCase();
-          urlSuggestedTags.push(domainName);
-          
-          // Add AI-specific suggestions based on common AI domains
-          if (domain.includes('openai') || domain.includes('chatgpt')) {
-            urlSuggestedTags.push('ai', 'text/chatbot');
-          } else if (domain.includes('claude') || domain.includes('anthropic')) {
-            urlSuggestedTags.push('ai', 'text/chatbot');
-          } else if (domain.includes('midjourney') || domain.includes('dalle') || domain.includes('leonardo')) {
-            urlSuggestedTags.push('ai', 'images', 'creative');
-          } else if (domain.includes('runway') || domain.includes('pika')) {
-            urlSuggestedTags.push('ai', 'videos', 'creative');
-          } else if (domain.includes('eleven') || domain.includes('murf') || domain.includes('voice')) {
-            urlSuggestedTags.push('ai', 'voice');
-          } else if (domain.includes('suno') || domain.includes('udio') || domain.includes('music')) {
-            urlSuggestedTags.push('ai', 'music');
-          } else if (domain.includes('github') && formData.url.includes('copilot')) {
-            urlSuggestedTags.push('ai', 'coding', 'development');
-          } else if (domain.includes('huggingface')) {
-            urlSuggestedTags.push('ai', 'development');
-          } else {
-            // Default AI suggestions
-            urlSuggestedTags.push('ai', 'productivity');
-          }
-          
-          // Filter out existing tags and set suggestions
-          const filteredSuggestions = urlSuggestedTags
-            .filter(tag => !formData.tags.includes(tag))
-            .filter((tag, index, self) => self.indexOf(tag) === index);
-            
-          setSuggestedTags(filteredSuggestions);
-          setIsLoading(false);
-        }, 500);
-      } catch (error) {
-        console.error("Error extracting metadata:", error);
-        setIsLoading(false);
-      }
-    };
+    // Don't auto-fetch if editing an existing bookmark
+    if (isEditing) return;
     
-    extractMetadata();
-  }, [formData.url, isEditing]);
+    // Use a timeout to avoid excessive API calls while typing
+    const timeoutId = setTimeout(() => {
+      if (formData.url && !metadataFetched) {
+        extractMetadata(formData.url);
+      }
+    }, 1000);
+    
+    return () => clearTimeout(timeoutId);
+  }, [formData.url, isEditing, metadataFetched]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -113,7 +109,17 @@ const BookmarkModal = ({ onClose, onSave, existingTags = [], bookmark = null }) 
   };
 
   const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    
+    // Reset metadata fetched flag when URL changes
+    if (field === 'url') {
+      setMetadataFetched(false);
+      setMetadataError(null);
+      setDescriptionSource('');
+    }
   };
 
   const toggleFavorite = () => {
@@ -144,6 +150,10 @@ const BookmarkModal = ({ onClose, onSave, existingTags = [], bookmark = null }) 
       e.preventDefault();
       addTag();
     }
+  };
+  
+  const handleManualFetch = () => {
+    extractMetadata(formData.url);
   };
 
   return (
@@ -181,9 +191,38 @@ const BookmarkModal = ({ onClose, onSave, existingTags = [], bookmark = null }) 
                   required
                 />
               </div>
-              {isLoading && (
-                <p className="text-xs text-blue-600 mt-1">Extracting app information...</p>
-              )}
+              
+              {/* Metadata Fetch Status */}
+              <div className="mt-2 flex items-center justify-between">
+                {isLoading ? (
+                  <p className="text-xs text-blue-600 flex items-center gap-1">
+                    <SafeIcon icon={FiLoader} className="w-3 h-3 animate-spin" />
+                    Fetching website information...
+                  </p>
+                ) : metadataError ? (
+                  <p className="text-xs text-red-600 flex items-center gap-1">
+                    <SafeIcon icon={FiAlertCircle} className="w-3 h-3" />
+                    {metadataError}
+                  </p>
+                ) : metadataFetched ? (
+                  <p className="text-xs text-green-600 flex items-center gap-1">
+                    <SafeIcon icon={FiInfo} className="w-3 h-3" />
+                    Website data retrieved successfully
+                  </p>
+                ) : formData.url ? (
+                  <p className="text-xs text-slate-500">Enter a valid URL to fetch website information</p>
+                ) : null}
+                
+                {formData.url && !isLoading && (
+                  <button
+                    type="button"
+                    onClick={handleManualFetch}
+                    className="text-xs text-blue-600 hover:text-blue-700 underline"
+                  >
+                    Refresh metadata
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Name Input */}
@@ -200,21 +239,21 @@ const BookmarkModal = ({ onClose, onSave, existingTags = [], bookmark = null }) 
                 required
               />
             </div>
-            
+
             {/* Favorite Toggle */}
             <div>
               <button
                 type="button"
                 onClick={toggleFavorite}
                 className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-all ${
-                  formData.favorite 
-                    ? 'bg-yellow-50 border-yellow-300 text-yellow-800' 
+                  formData.favorite
+                    ? 'bg-yellow-50 border-yellow-300 text-yellow-800'
                     : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                 }`}
               >
-                <SafeIcon 
-                  icon={FiStar} 
-                  className={`w-5 h-5 ${formData.favorite ? 'text-yellow-500' : 'text-slate-400'}`} 
+                <SafeIcon
+                  icon={FiStar}
+                  className={`w-5 h-5 ${formData.favorite ? 'text-yellow-500' : 'text-slate-400'}`}
                 />
                 {formData.favorite ? 'Marked as Favorite' : 'Mark as Favorite'}
               </button>
@@ -222,16 +261,49 @@ const BookmarkModal = ({ onClose, onSave, existingTags = [], bookmark = null }) 
 
             {/* Description Input */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Description
-              </label>
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-sm font-medium text-slate-700">
+                  Description
+                </label>
+                {formData.description && (
+                  <span className="text-xs text-slate-500">
+                    {formData.description.length}/300 characters
+                  </span>
+                )}
+              </div>
               <textarea
                 value={formData.description}
                 onChange={(e) => handleChange('description', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                  descriptionSource === 'metadata' ? 'border-green-300 bg-green-50' : 
+                  descriptionSource === 'fallback' ? 'border-amber-300 bg-amber-50' : 
+                  'border-slate-200'
+                }`}
                 placeholder="Brief description of the AI application..."
                 rows={2}
+                maxLength={300}
               />
+              
+              {/* Description source info */}
+              {descriptionSource === 'metadata' && formData.description && (
+                <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                  <SafeIcon icon={FiInfo} className="w-3 h-3" />
+                  Description extracted from website's metadata
+                </p>
+              )}
+              
+              {descriptionSource === 'fallback' && formData.description && (
+                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                  <SafeIcon icon={FiInfo} className="w-3 h-3" />
+                  Description extracted from website content
+                </p>
+              )}
+              
+              {!formData.description && !isLoading && formData.url && (
+                <p className="text-xs text-blue-600 mt-1">
+                  Description will be automatically populated from the website metadata when available
+                </p>
+              )}
             </div>
 
             {/* Commentary Input */}
@@ -278,7 +350,7 @@ const BookmarkModal = ({ onClose, onSave, existingTags = [], bookmark = null }) 
               {/* Tag suggestions */}
               {suggestedTags.length > 0 && (
                 <div className="mb-3">
-                  <p className="text-xs text-slate-500 mb-2">Suggested tags:</p>
+                  <p className="text-xs text-slate-500 mb-2">Suggested tags from website:</p>
                   <div className="flex flex-wrap gap-2">
                     {suggestedTags.map(tag => (
                       <button
@@ -296,31 +368,29 @@ const BookmarkModal = ({ onClose, onSave, existingTags = [], bookmark = null }) 
                 </div>
               )}
 
-              {/* Popular AI tags */}
-              <div className="mb-3">
-                <p className="text-xs text-slate-500 mb-2">Popular AI categories:</p>
-                <div className="flex flex-wrap gap-2">
-                  {aiSuggestedTags
-                    .filter(tag => !formData.tags.includes(tag))
-                    .slice(0, 15)
-                    .map(tag => (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => addSuggestedTag(tag)}
-                        className={`px-2 py-1 rounded text-xs hover:scale-105 transition-transform flex items-center gap-1 border border-slate-200 ${
-                          ['images', 'videos', 'music', 'voice', 'text/chatbot'].includes(tag)
-                            ? 'bg-gradient-to-r from-blue-100 to-purple-100 text-blue-800 font-medium'
-                            : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
-                        }`}
-                      >
-                        <SafeIcon icon={FiTag} className="w-3 h-3" />
-                        {tag}
-                        <SafeIcon icon={FiPlus} className="w-3 h-3" />
-                      </button>
-                    ))}
+              {/* Existing tags */}
+              {existingTags.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-xs text-slate-500 mb-2">Existing tags:</p>
+                  <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
+                    {existingTags
+                      .filter(tag => !formData.tags.includes(tag))
+                      .slice(0, 20)
+                      .map(tag => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => addSuggestedTag(tag)}
+                          className="px-2 py-1 bg-slate-50 text-slate-700 rounded text-xs hover:bg-slate-100 flex items-center gap-1 border border-slate-200"
+                        >
+                          <SafeIcon icon={FiTag} className="w-3 h-3" />
+                          {tag}
+                          <SafeIcon icon={FiPlus} className="w-3 h-3" />
+                        </button>
+                      ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Tag input */}
               <div className="flex gap-2">

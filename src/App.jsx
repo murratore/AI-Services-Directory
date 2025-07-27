@@ -5,14 +5,19 @@ import BookmarkCompactCard from './components/BookmarkCompactCard';
 import BookmarkModal from './components/BookmarkModal';
 import ImportExportModal from './components/ImportExportModal';
 import AuthModal from './components/AuthModal';
+import TagManagementModal from './components/TagManagementModal';
 import SearchBar from './components/SearchBar';
+import ResponsiveTagFilter from './components/ResponsiveTagFilter';
 import SafeIcon from './common/SafeIcon';
 import { exportBookmarks, importBookmarks, mergeBookmarks } from './utils/dataManager';
 import useAuth from './hooks/useAuth';
 import * as FiIcons from 'react-icons/fi';
 import './App.css';
 
-const { FiPlus, FiGrid, FiList, FiTag, FiCpu, FiDownload, FiUpload, FiLock, FiUnlock, FiStar, FiMenu, FiImage, FiVideo, FiMusic, FiMic, FiMessageSquare } = FiIcons;
+const { 
+  FiPlus, FiGrid, FiList, FiTag, FiCpu, FiDownload, FiUpload, 
+  FiLock, FiUnlock, FiStar, FiMenu, FiSettings 
+} = FiIcons;
 
 function App() {
   const [bookmarks, setBookmarks] = useState([]);
@@ -21,20 +26,12 @@ function App() {
   const [modalData, setModalData] = useState({ isOpen: false, bookmark: null });
   const [importExportModal, setImportExportModal] = useState(false);
   const [authModal, setAuthModal] = useState(false);
+  const [tagManagementModal, setTagManagementModal] = useState(false);
   const [selectedTag, setSelectedTag] = useState('all');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [tagCounts, setTagCounts] = useState({});
   const { isAuthenticated, isLoading, login, logout } = useAuth();
   const [authError, setAuthError] = useState(null);
-
-  // Popular AI category tags for filtering
-  const popularTags = [
-    { key: 'images', label: 'Images', icon: FiImage },
-    { key: 'videos', label: 'Videos', icon: FiVideo },
-    { key: 'music', label: 'Music', icon: FiMusic },
-    { key: 'voice', label: 'Voice', icon: FiMic },
-    { key: 'text/chatbot', label: 'Chat/Text', icon: FiMessageSquare }
-  ];
 
   // Initialize with AI-focused sample data
   useEffect(() => {
@@ -45,7 +42,7 @@ function App() {
         url: 'https://chat.openai.com',
         description: 'AI-powered conversational assistant by OpenAI',
         commentary: 'Revolutionary AI chatbot for coding, writing, and problem-solving',
-        tags: ['ai', 'text/chatbot', 'productivity'],
+        tags: ['ai', 'chatbot', 'productivity'],
         favorite: true,
         favicon: 'https://chat.openai.com/favicon.ico'
       },
@@ -55,7 +52,7 @@ function App() {
         url: 'https://claude.ai',
         description: 'Anthropic\'s helpful, harmless, and honest AI assistant',
         commentary: 'Great for detailed analysis and creative writing tasks',
-        tags: ['ai', 'text/chatbot', 'writing'],
+        tags: ['ai', 'chatbot', 'writing'],
         favorite: false,
         favicon: 'https://claude.ai/favicon.ico'
       },
@@ -105,7 +102,7 @@ function App() {
         url: 'https://perplexity.ai',
         description: 'AI-powered search engine and research assistant',
         commentary: 'Perfect for research with cited sources and real-time data',
-        tags: ['ai', 'text/chatbot', 'research', 'productivity'],
+        tags: ['ai', 'chatbot', 'research', 'productivity'],
         favorite: true,
         favicon: 'https://perplexity.ai/favicon.ico'
       },
@@ -151,12 +148,15 @@ function App() {
       favorites: bookmarkList.filter(b => b.favorite).length
     };
 
-    // Count only popular tags
-    popularTags.forEach(({ key }) => {
-      counts[key] = bookmarkList.filter(bookmark => bookmark.tags.includes(key)).length;
+    // Count all tags
+    const tagCountMap = {};
+    bookmarkList.forEach(bookmark => {
+      bookmark.tags.forEach(tag => {
+        tagCountMap[tag] = (tagCountMap[tag] || 0) + 1;
+      });
     });
 
-    setTagCounts(counts);
+    setTagCounts({ ...counts, ...tagCountMap });
   };
 
   const handleDragEnd = (result) => {
@@ -203,10 +203,7 @@ function App() {
         updateTagCounts(updatedBookmarks);
       } else {
         // Add new bookmark
-        // Generate a unique ID
         const newId = Date.now().toString();
-
-        // Get favicon using Google's favicon service
         const favicon = `https://www.google.com/s2/favicons?domain=${new URL(bookmarkData.url).hostname}&sz=32`;
 
         const newBookmark = {
@@ -232,6 +229,66 @@ function App() {
     const updatedBookmarks = bookmarks.filter(bookmark => bookmark.id !== bookmarkId);
     setBookmarks(updatedBookmarks);
     updateTagCounts(updatedBookmarks);
+  };
+
+  // Tag management functions
+  const handleRenameTag = (oldTag, newTag) => {
+    const updatedBookmarks = bookmarks.map(bookmark => ({
+      ...bookmark,
+      tags: bookmark.tags.map(tag => tag === oldTag ? newTag : tag)
+    }));
+    setBookmarks(updatedBookmarks);
+    updateTagCounts(updatedBookmarks);
+    
+    // Update selected tag if it was the renamed one
+    if (selectedTag === oldTag) {
+      setSelectedTag(newTag);
+    }
+  };
+
+  const handleDeleteTag = (tagToDelete) => {
+    const updatedBookmarks = bookmarks.map(bookmark => ({
+      ...bookmark,
+      tags: bookmark.tags.filter(tag => tag !== tagToDelete)
+    }));
+    setBookmarks(updatedBookmarks);
+    updateTagCounts(updatedBookmarks);
+    
+    // Reset filter if deleted tag was selected
+    if (selectedTag === tagToDelete) {
+      setSelectedTag('all');
+    }
+  };
+
+  const handleMergeTags = (tagsToMerge, targetTag) => {
+    const updatedBookmarks = bookmarks.map(bookmark => {
+      const newTags = [...bookmark.tags];
+      let hasAnyMergeTag = false;
+      
+      // Remove all merge tags and check if any existed
+      tagsToMerge.forEach(tag => {
+        const index = newTags.indexOf(tag);
+        if (index > -1) {
+          newTags.splice(index, 1);
+          hasAnyMergeTag = true;
+        }
+      });
+      
+      // Add target tag if any merge tag was present and target doesn't exist
+      if (hasAnyMergeTag && !newTags.includes(targetTag)) {
+        newTags.push(targetTag);
+      }
+      
+      return { ...bookmark, tags: newTags };
+    });
+    
+    setBookmarks(updatedBookmarks);
+    updateTagCounts(updatedBookmarks);
+    
+    // Update selected tag if it was one of the merged tags
+    if (tagsToMerge.includes(selectedTag)) {
+      setSelectedTag(targetTag);
+    }
   };
 
   // Export functionality
@@ -289,7 +346,7 @@ function App() {
     setAuthModal(false);
   };
 
-  // Get all unique tags from bookmarks (for modal purposes)
+  // Get all unique tags from bookmarks
   const allTags = [...new Set(bookmarks.flatMap(bookmark => bookmark.tags))].sort();
 
   // Filter bookmarks based on search term, selected tag, and favorites
@@ -321,19 +378,6 @@ function App() {
       '#06B6D4', // cyan
       '#84CC16', // lime
     ];
-
-    // Special colors for popular tags
-    const specialColors = {
-      'images': '#EC4899', // pink
-      'videos': '#EF4444', // red
-      'music': '#8B5CF6', // purple
-      'voice': '#10B981', // green
-      'text/chatbot': '#3B82F6' // blue
-    };
-
-    if (specialColors[tag]) {
-      return specialColors[tag];
-    }
 
     // Hash the tag string to get a consistent index
     const hash = tag.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -379,6 +423,13 @@ function App() {
                 icon={isAuthenticated ? FiUnlock : FiLock} 
                 className={`w-5 h-5 ${isAuthenticated ? 'text-green-600' : 'text-slate-600'}`} 
               />
+            </button>
+            <button
+              onClick={() => setTagManagementModal(true)}
+              className="p-2 rounded-lg bg-white shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors"
+              title="Manage tags"
+            >
+              <SafeIcon icon={FiSettings} className="w-5 h-5 text-slate-600" />
             </button>
             <button
               onClick={() => setImportExportModal(true)}
@@ -448,64 +499,18 @@ function App() {
           </div>
         </div>
 
-        {/* Filters Section */}
+        {/* Responsive Tag Filter */}
         <div className="mb-8">
-          {/* Favorites Filter */}
-          <div className="mb-4">
-            <button
-              onClick={toggleFavoritesFilter}
-              className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all ${
-                showFavoritesOnly
-                  ? 'bg-yellow-400 text-white shadow-md hover:bg-yellow-500'
-                  : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-              }`}
-            >
-              <SafeIcon icon={FiStar} className="w-4 h-4" />
-              {showFavoritesOnly ? 'Showing Favorites' : 'Show Favorites'}
-              <span
-                className={`px-2 py-0.5 text-xs rounded-full ${
-                  showFavoritesOnly ? 'bg-white bg-opacity-20 text-white' : 'bg-yellow-100 text-yellow-800'
-                }`}
-              >
-                {tagCounts.favorites || 0}
-              </span>
-            </button>
-          </div>
-
-          {/* Category Filter Navigation */}
-          <div className="overflow-x-auto pb-2">
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setSelectedTag('all')}
-                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap ${
-                  selectedTag === 'all' ? 'bg-slate-800 text-white' : 'bg-white text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <SafeIcon icon={FiCpu} className="w-4 h-4" />
-                All AI Apps
-                <span className="px-2 py-0.5 text-xs rounded-full bg-slate-700 text-white">
-                  {tagCounts.all || 0}
-                </span>
-              </button>
-
-              {popularTags.map(({ key, label, icon }) => (
-                <button
-                  key={key}
-                  onClick={() => setSelectedTag(key)}
-                  className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap ${
-                    selectedTag === key ? 'text-white' : 'bg-white text-slate-700 hover:bg-slate-100'
-                  }`}
-                  style={{ backgroundColor: selectedTag === key ? getTagColor(key) : '', color: selectedTag === key ? 'white' : '' }}
-                >
-                  <SafeIcon icon={icon} className="w-4 h-4" />
-                  {label}
-                  <span className="px-2 py-0.5 text-xs rounded-full bg-white bg-opacity-20 text-white">
-                    {tagCounts[key] || 0}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
+          <ResponsiveTagFilter
+            allTags={allTags}
+            tagCounts={tagCounts}
+            selectedTag={selectedTag}
+            onTagSelect={setSelectedTag}
+            showFavoritesOnly={showFavoritesOnly}
+            onToggleFavorites={toggleFavoritesFilter}
+            getTagColor={getTagColor}
+            onManageTags={() => setTagManagementModal(true)}
+          />
         </div>
 
         {/* Bookmarks */}
@@ -634,6 +639,17 @@ function App() {
           onLogout={handleLogout}
         />
       )}
+
+      {/* Tag Management Modal */}
+      <TagManagementModal
+        isOpen={tagManagementModal}
+        onClose={() => setTagManagementModal(false)}
+        allTags={allTags}
+        tagCounts={tagCounts}
+        onRenameTag={handleRenameTag}
+        onDeleteTag={handleDeleteTag}
+        onMergeTags={handleMergeTags}
+      />
     </div>
   );
 }
