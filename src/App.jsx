@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DragDropContext, Droppable } from 'react-beautiful-dnd';
 import BookmarkCard from './components/BookmarkCard';
+import BookmarkCompactCard from './components/BookmarkCompactCard';
 import BookmarkModal from './components/BookmarkModal';
 import ImportExportModal from './components/ImportExportModal';
 import AuthModal from './components/AuthModal';
@@ -11,7 +12,7 @@ import useAuth from './hooks/useAuth';
 import * as FiIcons from 'react-icons/fi';
 import './App.css';
 
-const { FiPlus, FiGrid, FiList, FiTag, FiCpu, FiDownload, FiUpload, FiLock, FiUnlock, FiStar } = FiIcons;
+const { FiPlus, FiGrid, FiList, FiTag, FiCpu, FiDownload, FiUpload, FiLock, FiUnlock, FiStar, FiMenu, FiImage, FiVideo, FiMusic, FiMic, FiMessageSquare } = FiIcons;
 
 function App() {
   const [bookmarks, setBookmarks] = useState([]);
@@ -25,6 +26,15 @@ function App() {
   const [tagCounts, setTagCounts] = useState({});
   const { isAuthenticated, isLoading, login, logout } = useAuth();
   const [authError, setAuthError] = useState(null);
+
+  // Popular AI category tags for filtering
+  const popularTags = [
+    { key: 'images', label: 'Images', icon: FiImage },
+    { key: 'videos', label: 'Videos', icon: FiVideo },
+    { key: 'music', label: 'Music', icon: FiMusic },
+    { key: 'voice', label: 'Voice', icon: FiMic },
+    { key: 'text/chatbot', label: 'Chat/Text', icon: FiMessageSquare }
+  ];
 
   // Initialize with AI-focused sample data
   useEffect(() => {
@@ -130,24 +140,22 @@ function App() {
         favicon: 'https://suno.ai/favicon.ico'
       }
     ];
-    
     setBookmarks(sampleBookmarks);
     updateTagCounts(sampleBookmarks);
   }, []);
 
   // Update tag counts when bookmarks change
   const updateTagCounts = (bookmarkList) => {
-    const counts = { 
+    const counts = {
       all: bookmarkList.length,
       favorites: bookmarkList.filter(b => b.favorite).length
     };
-    
-    bookmarkList.forEach(bookmark => {
-      bookmark.tags.forEach(tag => {
-        counts[tag] = (counts[tag] || 0) + 1;
-      });
+
+    // Count only popular tags
+    popularTags.forEach(({ key }) => {
+      counts[key] = bookmarkList.filter(bookmark => bookmark.tags.includes(key)).length;
     });
-    
+
     setTagCounts(counts);
   };
 
@@ -156,15 +164,14 @@ function App() {
       setAuthModal(true);
       return;
     }
-    
+
     const { destination, source } = result;
-    
     if (!destination) return;
-    
+
     const newBookmarks = Array.from(bookmarks);
     const [removed] = newBookmarks.splice(source.index, 1);
     newBookmarks.splice(destination.index, 0, removed);
-    
+
     setBookmarks(newBookmarks);
   };
 
@@ -173,7 +180,6 @@ function App() {
       setAuthModal(true);
       return;
     }
-    
     setModalData({ isOpen: true, bookmark });
   };
 
@@ -186,7 +192,7 @@ function App() {
       setAuthModal(true);
       return;
     }
-    
+
     try {
       if (existingId) {
         // Update existing bookmark
@@ -199,16 +205,16 @@ function App() {
         // Add new bookmark
         // Generate a unique ID
         const newId = Date.now().toString();
-        
+
         // Get favicon using Google's favicon service
         const favicon = `https://www.google.com/s2/favicons?domain=${new URL(bookmarkData.url).hostname}&sz=32`;
-        
+
         const newBookmark = {
           id: newId,
           ...bookmarkData,
           favicon
         };
-        
+
         const updatedBookmarks = [...bookmarks, newBookmark];
         setBookmarks(updatedBookmarks);
         updateTagCounts(updatedBookmarks);
@@ -223,7 +229,6 @@ function App() {
       setAuthModal(true);
       return;
     }
-    
     const updatedBookmarks = bookmarks.filter(bookmark => bookmark.id !== bookmarkId);
     setBookmarks(updatedBookmarks);
     updateTagCounts(updatedBookmarks);
@@ -235,7 +240,7 @@ function App() {
       setAuthModal(true);
       return;
     }
-    
+
     const result = exportBookmarks(bookmarks);
     if (result.success) {
       console.log(`Exported ${result.count} AI apps to ${result.filename}`);
@@ -250,9 +255,8 @@ function App() {
       setAuthModal(true);
       return { success: false, error: "Authentication required" };
     }
-    
+
     const importResult = await importBookmarks(file);
-    
     if (!importResult.success) {
       return importResult;
     }
@@ -285,23 +289,23 @@ function App() {
     setAuthModal(false);
   };
 
-  // Get all unique tags from bookmarks
+  // Get all unique tags from bookmarks (for modal purposes)
   const allTags = [...new Set(bookmarks.flatMap(bookmark => bookmark.tags))].sort();
 
   // Filter bookmarks based on search term, selected tag, and favorites
   const filteredBookmarks = bookmarks.filter(bookmark => {
     // Search filter
     const matchesSearch = 
-      bookmark.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      bookmark.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      bookmark.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      bookmark.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
       bookmark.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    
+
     // Tag filter
     const matchesTag = selectedTag === 'all' || bookmark.tags.includes(selectedTag);
-    
+
     // Favorites filter
     const matchesFavorites = !showFavoritesOnly || bookmark.favorite;
-    
+
     return matchesSearch && matchesTag && matchesFavorites;
   });
 
@@ -317,20 +321,20 @@ function App() {
       '#06B6D4', // cyan
       '#84CC16', // lime
     ];
-    
+
     // Special colors for popular tags
     const specialColors = {
-      'images': '#EC4899',     // pink
-      'videos': '#EF4444',     // red
-      'music': '#8B5CF6',      // purple
-      'voice': '#10B981',      // green
+      'images': '#EC4899', // pink
+      'videos': '#EF4444', // red
+      'music': '#8B5CF6', // purple
+      'voice': '#10B981', // green
       'text/chatbot': '#3B82F6' // blue
     };
-    
+
     if (specialColors[tag]) {
       return specialColors[tag];
     }
-    
+
     // Hash the tag string to get a consistent index
     const hash = tag.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     return colors[hash % colors.length];
@@ -342,6 +346,13 @@ function App() {
     if (!showFavoritesOnly) {
       setSelectedTag('all'); // Reset tag filter when enabling favorites
     }
+  };
+
+  // Toggle between view modes: grid, list, compact
+  const cycleViewMode = () => {
+    if (viewMode === 'grid') setViewMode('list');
+    else if (viewMode === 'list') setViewMode('compact');
+    else setViewMode('grid');
   };
 
   return (
@@ -356,8 +367,8 @@ function App() {
               </div>
               <h1 className="text-3xl font-bold text-slate-900">Michis AI Apps Directory</h1>
             </div>
-           
           </div>
+
           <div className="flex items-center gap-3">
             <button
               onClick={() => setAuthModal(true)}
@@ -377,10 +388,14 @@ function App() {
               <SafeIcon icon={FiDownload} className="w-5 h-5 text-slate-600" />
             </button>
             <button
-              onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+              onClick={cycleViewMode}
               className="p-2 rounded-lg bg-white shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors"
+              title={`Current: ${viewMode} view. Click to change.`}
             >
-              <SafeIcon icon={viewMode === 'grid' ? FiList : FiGrid} className="w-5 h-5 text-slate-600" />
+              <SafeIcon 
+                icon={viewMode === 'grid' ? FiGrid : viewMode === 'list' ? FiList : FiMenu} 
+                className="w-5 h-5 text-slate-600" 
+              />
             </button>
             <button
               onClick={() => handleOpenModal()}
@@ -392,20 +407,46 @@ function App() {
           </div>
         </div>
 
-        {/* Auth Status Banner - shows when not authenticated */}
-        {!isAuthenticated && !isLoading && (
-          <div className="mb-6 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3">
-            <SafeIcon icon={FiLock} className="w-5 h-5 text-amber-600" />
-            <div className="flex-1">
-              <p className="text-sm text-amber-800">
-                You're in view-only mode. <button onClick={() => setAuthModal(true)} className="font-medium underline">Log in</button> to edit, import, or export AI apps.
-              </p>
-            </div>
-          </div>
-        )}
-
         {/* Search Bar */}
         <SearchBar searchTerm={searchTerm} onSearchChange={setSearchTerm} />
+
+        {/* View Mode Indicator */}
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center">
+            <span className="text-sm text-slate-500 mr-2">View mode:</span>
+            <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">
+              <SafeIcon 
+                icon={viewMode === 'grid' ? FiGrid : viewMode === 'list' ? FiList : FiMenu} 
+                className="w-3 h-3" 
+              />
+              {viewMode.charAt(0).toUpperCase() + viewMode.slice(1)}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-blue-100 text-blue-800' : 'text-slate-500 hover:bg-slate-100'}`}
+              title="Grid view"
+            >
+              <SafeIcon icon={FiGrid} className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-blue-100 text-blue-800' : 'text-slate-500 hover:bg-slate-100'}`}
+              title="List view"
+            >
+              <SafeIcon icon={FiList} className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('compact')}
+              className={`p-1.5 rounded ${viewMode === 'compact' ? 'bg-blue-100 text-blue-800' : 'text-slate-500 hover:bg-slate-100'}`}
+              title="Compact view"
+            >
+              <SafeIcon icon={FiMenu} className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
 
         {/* Filters Section */}
         <div className="mb-8">
@@ -421,25 +462,23 @@ function App() {
             >
               <SafeIcon icon={FiStar} className="w-4 h-4" />
               {showFavoritesOnly ? 'Showing Favorites' : 'Show Favorites'}
-              <span className={`px-2 py-0.5 text-xs rounded-full ${
-                showFavoritesOnly 
-                  ? 'bg-white bg-opacity-20 text-white' 
-                  : 'bg-yellow-100 text-yellow-800'
-              }`}>
+              <span
+                className={`px-2 py-0.5 text-xs rounded-full ${
+                  showFavoritesOnly ? 'bg-white bg-opacity-20 text-white' : 'bg-yellow-100 text-yellow-800'
+                }`}
+              >
                 {tagCounts.favorites || 0}
               </span>
             </button>
           </div>
 
-          {/* Tag Navigation */}
+          {/* Category Filter Navigation */}
           <div className="overflow-x-auto pb-2">
             <div className="flex space-x-2">
               <button
                 onClick={() => setSelectedTag('all')}
                 className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap ${
-                  selectedTag === 'all'
-                    ? 'bg-slate-800 text-white'
-                    : 'bg-white text-slate-700 hover:bg-slate-100'
+                  selectedTag === 'all' ? 'bg-slate-800 text-white' : 'bg-white text-slate-700 hover:bg-slate-100'
                 }`}
               >
                 <SafeIcon icon={FiCpu} className="w-4 h-4" />
@@ -448,25 +487,20 @@ function App() {
                   {tagCounts.all || 0}
                 </span>
               </button>
-              
-              {allTags.map(tag => (
+
+              {popularTags.map(({ key, label, icon }) => (
                 <button
-                  key={tag}
-                  onClick={() => setSelectedTag(tag)}
+                  key={key}
+                  onClick={() => setSelectedTag(key)}
                   className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap ${
-                    selectedTag === tag
-                      ? 'bg-slate-800 text-white'
-                      : 'bg-white text-slate-700 hover:bg-slate-100'
+                    selectedTag === key ? 'text-white' : 'bg-white text-slate-700 hover:bg-slate-100'
                   }`}
-                  style={{ 
-                    backgroundColor: selectedTag === tag ? getTagColor(tag) : '',
-                    color: selectedTag === tag ? 'white' : ''
-                  }}
+                  style={{ backgroundColor: selectedTag === key ? getTagColor(key) : '', color: selectedTag === key ? 'white' : '' }}
                 >
-                  <SafeIcon icon={FiTag} className="w-4 h-4" />
-                  {tag}
+                  <SafeIcon icon={icon} className="w-4 h-4" />
+                  {label}
                   <span className="px-2 py-0.5 text-xs rounded-full bg-white bg-opacity-20 text-white">
-                    {tagCounts[tag] || 0}
+                    {tagCounts[key] || 0}
                   </span>
                 </button>
               ))}
@@ -482,21 +516,35 @@ function App() {
                 ref={provided.innerRef}
                 {...provided.droppableProps}
                 className={`grid gap-4 ${
-                  viewMode === 'grid' 
-                    ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' 
+                  viewMode === 'grid'
+                    ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+                    : viewMode === 'compact'
+                    ? 'grid-cols-1'
                     : 'grid-cols-1'
                 }`}
               >
                 {filteredBookmarks.map((bookmark, index) => (
-                  <BookmarkCard
-                    key={bookmark.id}
-                    bookmark={bookmark}
-                    index={index}
-                    onUpdate={(id, updates) => handleSaveBookmark({...bookmark, ...updates}, id)}
-                    onDelete={deleteBookmark}
-                    tagColors={getTagColor}
-                    onEdit={handleOpenModal}
-                  />
+                  viewMode === 'compact' ? (
+                    <BookmarkCompactCard
+                      key={bookmark.id}
+                      bookmark={bookmark}
+                      index={index}
+                      onUpdate={(id, updates) => handleSaveBookmark({ ...bookmark, ...updates }, id)}
+                      onDelete={deleteBookmark}
+                      tagColors={getTagColor}
+                      onEdit={handleOpenModal}
+                    />
+                  ) : (
+                    <BookmarkCard
+                      key={bookmark.id}
+                      bookmark={bookmark}
+                      index={index}
+                      onUpdate={(id, updates) => handleSaveBookmark({ ...bookmark, ...updates }, id)}
+                      onDelete={deleteBookmark}
+                      tagColors={getTagColor}
+                      onEdit={handleOpenModal}
+                    />
+                  )
                 ))}
                 {provided.placeholder}
               </div>
@@ -531,18 +579,16 @@ function App() {
               )}
             </div>
             <h3 className="text-lg font-medium text-slate-900 mb-2">
-              {showFavoritesOnly 
-                ? "No favorite AI apps found" 
-                : "No matching AI apps"}
+              {showFavoritesOnly ? "No favorite AI apps found" : "No matching AI apps"}
             </h3>
             <p className="text-slate-600 mb-6">
               {showFavoritesOnly
                 ? "Mark some apps as favorites or try a different filter"
-                : "Try a different search term or tag"}
+                : "Try a different search term or category"}
             </p>
             <button
               onClick={() => {
-                setSelectedTag('all'); 
+                setSelectedTag('all');
                 setSearchTerm('');
                 setShowFavoritesOnly(false);
               }}
